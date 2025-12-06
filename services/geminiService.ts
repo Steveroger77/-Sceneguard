@@ -1,20 +1,49 @@
+import * as tf from '@tensorflow/tfjs';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import { DetectedObject, ObjectStatus, BoundingBox } from "../types";
 
-// --- Model Loading ---
+// --- Model and TF.js Initialization ---
 let modelPromise: Promise<cocoSsd.ObjectDetection>;
+let tfReadyPromise: Promise<void>;
 
+// Initializes the TF.js backend.
+function initializeTf(): Promise<void> {
+    if (!tfReadyPromise) {
+        console.log("Waiting for TensorFlow.js backend to be ready...");
+        // tf.ready() returns a promise that resolves when the backend is ready.
+        // This relies on TFJS's automatic backend selection, avoiding redundant setup.
+        tfReadyPromise = tf.ready();
+        tfReadyPromise.then(() => {
+            console.log(`TensorFlow.js backend (${tf.getBackend()}) is initialized and ready.`);
+        }).catch(err => {
+            console.error("TensorFlow.js failed to initialize:", err);
+        });
+    }
+    return tfReadyPromise;
+}
+
+// Loads the COCO-SSD model, ensuring TF.js is ready first.
 function loadModel(): Promise<cocoSsd.ObjectDetection> {
     if (!modelPromise) {
-        console.log("Loading local object detection model...");
-        modelPromise = cocoSsd.load();
-        modelPromise.then(() => console.log("Model loaded successfully."));
+        modelPromise = new Promise(async (resolve, reject) => {
+            try {
+                await initializeTf(); // Ensure backend is ready
+                console.log("Loading local object detection model...");
+                const model = await cocoSsd.load();
+                console.log("Model loaded successfully.");
+                resolve(model);
+            } catch (error) {
+                console.error("Failed to load COCO-SSD model:", error);
+                reject(error);
+            }
+        });
     }
     return modelPromise;
 }
 
-// Ensure model is pre-loaded on app start
+// Eagerly start the loading process. Functions that use the model will await the promise.
 loadModel();
+
 
 // --- Core Detection Function ---
 export const detectObjectsInScene = async (base64Image: string): Promise<DetectedObject[]> => {
