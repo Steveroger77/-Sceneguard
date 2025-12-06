@@ -4,7 +4,7 @@ import BoundingBoxOverlay from './components/BoundingBoxOverlay';
 import { detectObjectsInScene, compareScenes } from './services/geminiService';
 import { SceneReference, DetectedObject, ViewMode, ObjectStatus, BoundingBox, FeatureItem, VideoResolution } from './types';
 import { initDB, getAllFeatures, addFeature, deleteFeature, updateFeature } from './services/db';
-import { Camera, Trash2, Play, Pause, Upload, Loader2, Eye, Images, EyeOff, X, RotateCcw, ChevronDown, ChevronUp, ListFilter, RefreshCw, Save, Plus, ImageIcon, Video, VideoOff, Pencil, Check } from 'lucide-react';
+import { Camera, Trash2, Play, Pause, Upload, Loader2, Eye, Images, EyeOff, X, RotateCcw, ChevronDown, ChevronUp, ListFilter, RefreshCw, Save, Plus, ImageIcon, Video, VideoOff, Pencil, Check, AlertTriangle } from 'lucide-react';
 
 const DEFAULT_FEATURES: Omit<FeatureItem, 'id'>[] = [
   {
@@ -216,6 +216,7 @@ const App: React.FC = () => {
   // --- Core App Data ---
   const [references, setReferences] = useState<SceneReference[]>([]);
   const [activeRefId, setActiveRefId] = useState<string | null>(null);
+  const [apiKeyMissing, setApiKeyMissing] = useState(false);
   
   // --- Features Data & DB State ---
   const [featuresList, setFeaturesList] = useState<FeatureItem[]>([]);
@@ -271,6 +272,13 @@ const App: React.FC = () => {
 
   // --- Initialization ---
   useEffect(() => {
+    // CRITICAL: Check for API Key on startup.
+    if (!process.env.API_KEY) {
+      console.error("FATAL: API_KEY environment variable is not set.");
+      setApiKeyMissing(true);
+      return; // Halt further initialization
+    }
+
     getDevices();
     
     // Initialize DB and load features
@@ -765,6 +773,24 @@ const App: React.FC = () => {
   }, [references]);
 
   // --- RENDERERS ---
+
+  if (apiKeyMissing) {
+    return (
+      <div className="flex items-center justify-center h-screen w-full bg-fog-base">
+        <div className="bg-red-900/20 border border-red-500/50 rounded-2xl p-8 max-w-lg text-center shadow-2xl">
+          <div className="w-16 h-16 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Configuration Error</h1>
+          <p className="text-red-300/80 text-lg">
+            The Gemini API key is missing. Please set the `API_KEY` environment variable in your deployment settings.
+          </p>
+          <p className="text-fog-dim mt-4 text-sm">The application cannot start without a valid API key.</p>
+        </div>
+      </div>
+    );
+  }
+
   const renderCreateReference = () => (
     <div className="h-full flex flex-col gap-6">
       {/* Header / Toolbar - Added relative z-50 to ensure dropdowns render on top of video */}

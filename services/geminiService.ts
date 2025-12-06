@@ -38,7 +38,6 @@ const cleanJsonString = (str: string): string => {
   return cleaned;
 };
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Schema for object detection
 const detectionSchema = {
@@ -90,6 +89,7 @@ const IGNORED_TERMS = ['camo', 'watermark', 'logo', 'ui', 'text', 'overlay', 'ti
 
 export const detectObjectsInScene = async (base64Image: string, retryCount = 0): Promise<DetectedObject[]> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     let response;
 
     // STRATEGY: 
@@ -186,6 +186,7 @@ export const compareScenes = async (
   knownObjects: DetectedObject[] // Pass context if available
 ): Promise<DetectedObject[]> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const isBlindComparison = knownObjects.length === 0;
     
     let systemInstruction = "You are a precise object tracker.";
