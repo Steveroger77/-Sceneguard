@@ -447,9 +447,31 @@ const App: React.FC = () => {
         });
       });
 
+      // --- START: Robust Connection Handling ---
+      peer.on('disconnected', () => {
+        console.warn('PeerJS connection lost. Attempting to reconnect automatically...');
+        // A small delay prevents a reconnect loop if the server is truly down.
+        setTimeout(() => {
+          if (peer && !peer.destroyed && peer.disconnected) {
+            console.log('Forcing PeerJS reconnection...');
+            peer.reconnect();
+          }
+        }, 3000);
+      });
+
       peer.on('error', (err: any) => {
         console.error("❌ Peer Connection Error:", err);
+        // The 'network' error type is often emitted when the connection to the server is lost.
+        if (err.type === 'network' || err.message.includes('Lost connection')) {
+            console.warn('PeerJS network error detected. Attempting to reconnect...');
+             setTimeout(() => {
+                if (peer && !peer.destroyed && peer.disconnected) {
+                    peer.reconnect();
+                }
+            }, 3000);
+        }
       });
+      // --- END: Robust Connection Handling ---
 
       peerInstance.current = peer;
     } catch (e) {

@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { DetectedObject, ObjectStatus } from "../types";
 
 // Helper to clean JSON string
@@ -41,7 +41,7 @@ const cleanJsonString = (str: string): string => {
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Schema for object detection
-const detectionSchema: Schema = {
+const detectionSchema = {
   type: Type.OBJECT,
   properties: {
     objects: {
@@ -62,7 +62,7 @@ const detectionSchema: Schema = {
 };
 
 // Schema for comparison
-const comparisonSchema: Schema = {
+const comparisonSchema = {
   type: Type.OBJECT,
   properties: {
     objects: {
