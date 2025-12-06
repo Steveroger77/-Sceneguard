@@ -272,9 +272,11 @@ const App: React.FC = () => {
 
   // --- Initialization ---
   useEffect(() => {
-    // CRITICAL: Check for API Key on startup.
-    if (!process.env.API_KEY) {
-      console.error("FATAL: API_KEY environment variable is not set.");
+    // CRITICAL: Safely check for API Key on startup to prevent crash.
+    const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+
+    if (!apiKey) {
+      console.error("FATAL: API_KEY environment variable is not set or accessible in this environment.");
       setApiKeyMissing(true);
       return; // Halt further initialization
     }
