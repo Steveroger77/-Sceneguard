@@ -36,7 +36,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView }) 
         </div>
 
         {/* Navigation */}
-        <nav className="px-0 space-y-3">
+        <nav className="px-0 space-y-3" role="menu" aria-label="Main Navigation">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -44,6 +44,8 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView }) 
               <button
                 key={item.id}
                 onClick={() => onChangeView(item.id)}
+                role="menuitem"
+                aria-current={isActive ? 'page' : undefined}
                 className={`w-full flex items-center h-14 transition-all duration-200 whitespace-nowrap overflow-hidden relative group/btn ${
                   isActive
                     ? 'text-white'

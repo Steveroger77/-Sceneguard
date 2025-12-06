@@ -85,6 +85,8 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className="h-11 w-full flex items-center justify-between gap-3 bg-[#121416] hover:bg-white/5 border border-white/10 text-white text-sm rounded-xl px-4 transition-all outline-none focus:border-white/30 group whitespace-nowrap shadow-sm hover:shadow-md"
         title={selectedOption?.label || placeholder}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
       >
         <div className="flex items-center gap-2 overflow-hidden flex-1">
           {Icon && <Icon className="w-4 h-4 text-white/50 shrink-0" />}
@@ -96,7 +98,10 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute top-[calc(100%+8px)] left-0 min-w-full w-max max-w-[350px] bg-[#1A1D21] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in-95 duration-150 ring-1 ring-black/50">
+        <div 
+          role="listbox"
+          className="absolute top-[calc(100%+8px)] left-0 min-w-full w-max max-w-[350px] bg-[#1A1D21] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in-95 duration-150 ring-1 ring-black/50"
+        >
           <div className="p-1.5">
             {options.map((opt) => (
               <button
@@ -105,6 +110,8 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
                   onChange(opt.value);
                   setIsOpen(false);
                 }}
+                role="option"
+                aria-selected={value === opt.value}
                 className={`w-full text-left px-3 py-2.5 text-sm flex items-center gap-3 rounded-lg transition-colors border border-transparent ${
                   value === opt.value 
                     ? 'bg-white/10 text-white font-medium border-white/5' 
@@ -155,6 +162,7 @@ const App: React.FC = () => {
   const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
   const [currentFrameImage, setCurrentFrameImage] = useState<string | null>(null);
   const [monitoringActive, setMonitoringActive] = useState(false);
+  const scanLoopRef = useRef<number>();
 
   // --- Editing States ---
   const [editingRefName, setEditingRefName] = useState<string>("");
@@ -407,12 +415,31 @@ const App: React.FC = () => {
   }, [activeRefId, references, captureFrame, isMonitoringScanInProgress]);
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (monitoringActive && isCameraEnabled && stream) {
-      performScan(); 
-      interval = setInterval(performScan, 2000); 
+    if (!monitoringActive || !isCameraEnabled || !stream) {
+      return;
     }
-    return () => { if (interval) clearInterval(interval); };
+    
+    let lastScanTime = 0;
+    const SCAN_INTERVAL = 2000; // 2 seconds
+
+    const scanLoop = (timestamp: number) => {
+        if (!monitoringActiveRef.current) return; // Check if still active
+        if (timestamp - lastScanTime > SCAN_INTERVAL) {
+            lastScanTime = timestamp;
+            performScan();
+        }
+        scanLoopRef.current = requestAnimationFrame(scanLoop);
+    };
+
+    const monitoringActiveRef = { current: true };
+    scanLoopRef.current = requestAnimationFrame(scanLoop);
+
+    return () => {
+        monitoringActiveRef.current = false;
+        if (scanLoopRef.current) {
+            cancelAnimationFrame(scanLoopRef.current);
+        }
+    };
   }, [monitoringActive, isCameraEnabled, stream, performScan]);
 
   const toggleMonitoring = () => {

@@ -4,35 +4,37 @@ const DB_NAME = 'SceneGuardDB_v2';
 const DB_VERSION = 6;
 const STORE_NAME = 'features';
 
-export const openDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+let dbPromise: Promise<IDBDatabase> | null = null;
 
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      
-      // Clear existing store on upgrade to refresh defaults
-      if (db.objectStoreNames.contains(STORE_NAME)) {
-        db.deleteObjectStore(STORE_NAME);
-      }
+const getDB = (): Promise<IDBDatabase> => {
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-      }
-    };
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (db.objectStoreNames.contains(STORE_NAME)) {
+          db.deleteObjectStore(STORE_NAME);
+        }
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+        }
+      };
 
-    request.onsuccess = (event) => {
-      resolve((event.target as IDBOpenDBRequest).result);
-    };
+      request.onsuccess = (event) => {
+        resolve((event.target as IDBOpenDBRequest).result);
+      };
 
-    request.onerror = (event) => {
-      reject((event.target as IDBOpenDBRequest).error);
-    };
-  });
+      request.onerror = (event) => {
+        reject((event.target as IDBOpenDBRequest).error);
+      };
+    });
+  }
+  return dbPromise;
 };
 
 export const getAllFeatures = async (): Promise<FeatureItem[]> => {
-  const db = await openDB();
+  const db = await getDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
@@ -44,7 +46,7 @@ export const getAllFeatures = async (): Promise<FeatureItem[]> => {
 };
 
 export const addFeature = async (feature: Omit<FeatureItem, 'id'>): Promise<number> => {
-  const db = await openDB();
+  const db = await getDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
@@ -56,7 +58,7 @@ export const addFeature = async (feature: Omit<FeatureItem, 'id'>): Promise<numb
 };
 
 export const updateFeature = async (feature: FeatureItem): Promise<void> => {
-  const db = await openDB();
+  const db = await getDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
@@ -68,7 +70,7 @@ export const updateFeature = async (feature: FeatureItem): Promise<void> => {
 };
 
 export const deleteFeature = async (id: number): Promise<void> => {
-  const db = await openDB();
+  const db = await getDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
