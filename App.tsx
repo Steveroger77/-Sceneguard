@@ -3,11 +3,8 @@ import Layout from './components/Layout';
 import BoundingBoxOverlay from './components/BoundingBoxOverlay';
 import { detectObjectsInScene, compareScenes } from './services/geminiService';
 import { SceneReference, DetectedObject, ViewMode, ObjectStatus, BoundingBox, FeatureItem, VideoResolution } from './types';
-import { initDB, getAllFeatures, addFeature, deleteFeature, updateFeature, openDB } from './services/db';
-import { Camera, Trash2, Play, Pause, Upload, Loader2, Eye, Images, EyeOff, X, Usb, ClipboardCheck, Settings2, RotateCcw, ChevronDown, ChevronUp, ListFilter, RefreshCw, Smartphone, Copy, AlertCircle, Save, Plus, PlusCircle, Image as ImageIcon, Code, Power, Video, VideoOff, Pencil, Check, Globe, ImageOff } from 'lucide-react';
-
-// Declare PeerJS global
-declare const Peer: any;
+import { initDB, getAllFeatures, addFeature, deleteFeature, updateFeature } from './services/db';
+import { Camera, Trash2, Play, Pause, Upload, Loader2, Eye, Images, EyeOff, X, RotateCcw, ChevronDown, ChevronUp, ListFilter, RefreshCw, Save, Plus, ImageIcon, Video, VideoOff, Pencil, Check } from 'lucide-react';
 
 const DEFAULT_FEATURES: Omit<FeatureItem, 'id'>[] = [
   {
@@ -237,24 +234,8 @@ const App: React.FC = () => {
   const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
   // Start with 'default' to map to PC Webcam immediately
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('default');
-  const [selectedResolution, setSelectedResolution] = useState<VideoResolution>('auto');
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-
-  // --- Remote/USB Connection State ---
-  const [peerId, setPeerId] = useState<string | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const peerInstance = useRef<any>(null);
-
-  // --- Recording State ---
-  const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
-
-  // --- Modal State ---
-  const [showLinkModal, setShowLinkModal] = useState(false);
-  const [linkTab, setLinkTab] = useState<'native' | 'manual'>('native');
-  const [copiedCode, setCopiedCode] = useState(false);
 
   // --- Processing State ---
   const [isProcessing, setIsProcessing] = useState(false);
@@ -281,18 +262,16 @@ const App: React.FC = () => {
   
   // --- Cleanup Helper ---
   const stopTracks = useCallback((mediaStream: MediaStream | null) => {
-      // Don't stop remote streams here to preserve P2P connection, just stop local ones
-      if (mediaStream && mediaStream !== remoteStream) {
+      if (mediaStream) {
           mediaStream.getTracks().forEach(track => {
               track.stop();
           });
       }
-  }, [remoteStream]);
+  }, []);
 
   // --- Initialization ---
   useEffect(() => {
     getDevices();
-    initializeHostPeer();
     
     // Initialize DB and load features
     const initAppDB = async () => {
@@ -311,7 +290,6 @@ const App: React.FC = () => {
     return () => {
       // Use ref for cleanup to ensure we catch the stream even if state is stale
       stopTracks(streamRef.current);
-      if (peerInstance.current) peerInstance.current.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
@@ -422,63 +400,6 @@ const App: React.FC = () => {
     }
   };
 
-  // --- PeerJS Host Initialization (For USB Tethering) ---
-  const initializeHostPeer = () => {
-    try {
-      if (typeof Peer === 'undefined') return;
-      
-      const id = 'SG-' + Math.random().toString(36).substr(2, 5).toUpperCase();
-      const peer = new Peer(id, { debug: 1 });
-      
-      peer.on('open', (id: string) => {
-        console.log('✅ Remote Host Ready ID:', id);
-        setPeerId(id);
-      });
-
-      peer.on('call', (call: any) => {
-        console.log("📞 Incoming connection from USB/Remote device...");
-        call.answer(); // Answer automatically
-        call.on('stream', (remoteStream: MediaStream) => {
-          console.log("🎥 Remote stream received!");
-          setRemoteStream(remoteStream);
-          setIsCameraEnabled(true);
-          // Auto-switch to "Remote" in dropdown logic effectively by prioritizing remoteStream
-          setShowLinkModal(false);
-        });
-      });
-
-      // --- START: Robust Connection Handling ---
-      peer.on('disconnected', () => {
-        console.warn('PeerJS connection lost. Attempting to reconnect automatically...');
-        // A small delay prevents a reconnect loop if the server is truly down.
-        setTimeout(() => {
-          if (peer && !peer.destroyed && peer.disconnected) {
-            console.log('Forcing PeerJS reconnection...');
-            peer.reconnect();
-          }
-        }, 3000);
-      });
-
-      peer.on('error', (err: any) => {
-        console.error("❌ Peer Connection Error:", err);
-        // The 'network' error type is often emitted when the connection to the server is lost.
-        if (err.type === 'network' || err.message.includes('Lost connection')) {
-            console.warn('PeerJS network error detected. Attempting to reconnect...');
-             setTimeout(() => {
-                if (peer && !peer.destroyed && peer.disconnected) {
-                    peer.reconnect();
-                }
-            }, 3000);
-        }
-      });
-      // --- END: Robust Connection Handling ---
-
-      peerInstance.current = peer;
-    } catch (e) {
-      console.error("PeerJS failed to load", e);
-    }
-  };
-
   // --- Helper: Enumerate Devices ---
   const getDevices = async () => {
     try {
@@ -503,17 +424,6 @@ const App: React.FC = () => {
   const startStream = async (deviceId?: string) => {
     setCameraError(null);
     
-    // Check if we should show Remote Stream instead of local webcam
-    if (remoteStream && deviceId === 'remote') {
-       // Safely stop previous stream first
-       stopTracks(streamRef.current);
-       
-       streamRef.current = remoteStream;
-       setStream(remoteStream);
-       setIsCameraEnabled(true);
-       return;
-    }
-
     const getMedia = async (constraints: MediaStreamConstraints) => {
       return await navigator.mediaDevices.getUserMedia(constraints);
     };
@@ -606,46 +516,6 @@ const App: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, isCameraEnabled]);
-
-
-  // --- Recording Logic ---
-  const toggleRecording = () => {
-    if (isRecording) {
-      // STOP RECORDING
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-        setIsRecording(false);
-      }
-    } else {
-      // START RECORDING
-      if (!stream) return;
-      recordedChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-      
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          recordedChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = `sceneguard-recording-${Date.now()}.webm`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        console.log("Recording saved");
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    }
-  };
-
 
   // --- Capture & AI Logic ---
   
@@ -873,37 +743,19 @@ const App: React.FC = () => {
       setIsProcessing(false);
     }
   };
-
-  // ... (Keep existing PeerJS code) ...
-  // --- HTML Client Generator for USB Tethering ---
-  const getManualClientCode = () => {
-    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script><style>body{background:#000;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;height:100vh;margin:0;padding:20px;box-sizing:border-box}video{width:100%;max-height:50vh;background:#222;border-radius:12px;margin-bottom:20px;object-fit:cover}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:400px}button{padding:14px;font-size:16px;font-weight:bold;border:none;border-radius:12px;cursor:pointer}.btn-primary{background:#00ff88;color:#000;grid-column:span 2}.btn-secondary{background:#333;color:#fff;border:1px solid #444}.status{margin-top:15px;color:#888;font-family:monospace;font-size:12px;text-align:center}</style></head><body><video id="v" muted autoplay playsinline></video><div class="controls" id="ctrls"><button onclick="startStream()" class="btn-primary" id="startBtn">⚡ Start Stream</button><button onclick="switchCam()" class="btn-secondary">🔄 Switch Cam</button><button onclick="setRes('hd')" class="btn-secondary" id="btn-hd">HD</button></div><div id="log" class="status">Ready...</div><script>const HOST_ID="${peerId}";let currentFacingMode='environment';let currentRes={width:1280,height:720};let peer=null;let localStream=null;function log(m){document.getElementById('log').innerText=m}async function startStream(){try{if(localStream)localStream.getTracks().forEach(t=>t.stop());log("Accessing Camera...");localStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:currentFacingMode,width:{ideal:currentRes.width},height:{ideal:currentRes.height}},audio:false});document.getElementById('v').srcObject=localStream;document.getElementById('startBtn').style.display='none';if(!peer){log("Connecting...");peer=new Peer();peer.on('open',(id)=>{callHost()});peer.on('error',e=>log("Peer Error: "+e))}else{callHost()}}catch(e){log("Error: "+e)}}function callHost(){if(!peer)return;log("Calling Host...");const call=peer.call(HOST_ID,localStream);call.on('stream',()=>log("Streaming Active ✅"));call.on('close',()=>log("Call Ended"));call.on('error',(e)=>log("Call Error: "+e))}function switchCam(){currentFacingMode=currentFacingMode==='environment'?'user':'environment';startStream()}function setRes(type){if(type==='hd')currentRes={width:1280,height:720};else if(type==='fhd')currentRes={width:1920,height:1080};startStream()}</script></body></html>`;
-  };
-
-  const copyManualCode = () => {
-    navigator.clipboard.writeText(getManualClientCode());
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
-
-  // Updated Camera Options Logic: Prioritize PC Webcam
+  
   const cameraOptions = useMemo(() => {
     const opts = [
-        { value: 'default', label: 'PC Webcam (Default)' }
+        { value: 'default', label: 'Default Webcam' }
     ];
     
-    if (remoteStream) {
-        opts.push({ value: 'remote', label: '⚡ USB/Remote Phone' });
-    }
-    
     availableDevices.forEach(d => {
-        // Avoid duplicate "default" entries if possible, or just list them all
         if (d.deviceId !== 'default') {
              opts.push({ value: d.deviceId, label: d.label || `Camera ${d.deviceId.slice(0,5)}` });
         }
     });
     return opts;
-  }, [availableDevices, remoteStream]);
+  }, [availableDevices]);
 
   const referenceOptions = useMemo(() => {
     return [
@@ -913,34 +765,6 @@ const App: React.FC = () => {
   }, [references]);
 
   // --- RENDERERS ---
-
-  const renderLinkModal = () => {
-    if (!showLinkModal) return null;
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl transition-all duration-300">
-         <div className="bg-[#121416] border border-white/10 rounded-[32px] max-w-5xl w-full shadow-2xl overflow-hidden relative flex flex-col max-h-[90vh]">
-            <button onClick={() => setShowLinkModal(false)} className="absolute top-4 right-4 z-20 p-2 bg-white/5 hover:bg-white/10 rounded-full text-white/60 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
-            <div className="p-8 pb-0 shrink-0">
-               <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3"><Smartphone className="w-8 h-8 text-brand-500" /> Connect Phone (Wired / USB)</h2>
-               <div className="flex gap-4 border-b border-white/10 mt-6"><button onClick={() => setLinkTab('native')} className={`pb-4 px-2 font-bold text-sm transition-colors relative ${linkTab === 'native' ? 'text-status-present' : 'text-white/40 hover:text-white'}`}>Android 14+ (Native Webcam) {linkTab === 'native' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-status-present"></div>}</button><button onClick={() => setLinkTab('manual')} className={`pb-4 px-2 font-bold text-sm transition-colors relative ${linkTab === 'manual' ? 'text-brand-500' : 'text-white/40 hover:text-white'}`}>Legacy / USB Tether (Code) {linkTab === 'manual' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500"></div>}</button></div>
-            </div>
-            <div className="p-8 overflow-y-auto custom-scrollbar">
-               {linkTab === 'native' ? (
-                 <div className="space-y-6">
-                    <div className="bg-status-present/5 rounded-2xl p-6 border border-status-present/20"><div className="flex items-start gap-4"><div className="w-10 h-10 bg-status-present/20 rounded-xl flex items-center justify-center text-status-present shrink-0"><Usb className="w-5 h-5" /></div><div><h3 className="text-xl font-bold text-white mb-2">Android Native Webcam</h3><ol className="space-y-3 text-white/80 list-decimal pl-4 text-sm"><li>Connect phone via USB.</li><li>Tap notification "Charging via USB" -> Select "Webcam".</li><li>Click Refresh below.</li></ol></div></div></div>
-                 </div>
-               ) : (
-                 <div className="space-y-6">
-                    <div className="bg-brand-500/5 rounded-2xl p-6 border border-brand-500/20"><h3 className="text-xl font-bold text-white mb-2">USB Tethering Bridge</h3><div className="relative"><textarea readOnly className="w-full h-32 bg-black border border-white/20 rounded-xl p-4 text-xs font-mono text-brand-500 focus:outline-none" value={getManualClientCode()}/><button onClick={copyManualCode} className="absolute top-2 right-2 flex items-center gap-2 px-3 py-1.5 bg-white text-black rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors">{copiedCode ? <ClipboardCheck className="w-3 h-3" /> : <Copy className="w-3 h-3" />} {copiedCode ? 'Copied' : 'Copy Code'}</button></div></div>
-                 </div>
-               )}
-               <div className="mt-8 flex justify-center"><button onClick={() => { getDevices(); setShowLinkModal(false); }} className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-2xl font-bold hover:scale-105 transition-transform shadow-xl hover:shadow-white/20"><RefreshCw className="w-4 h-4" /> Refresh Camera List</button></div>
-            </div>
-         </div>
-      </div>
-    );
-  };
-
   const renderCreateReference = () => (
     <div className="h-full flex flex-col gap-6">
       {/* Header / Toolbar - Added relative z-50 to ensure dropdowns render on top of video */}
@@ -968,11 +792,6 @@ const App: React.FC = () => {
                     // Added w-72 shrink-0 to prevent text cutoff and force sufficient width
                     className="w-72 shrink-0 z-[60]" 
                  />
-                 
-                 <button onClick={() => setShowLinkModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-[#121416] hover:bg-white/10 text-brand-500 rounded-xl text-sm font-bold transition-colors border border-brand-500/20 shrink-0 whitespace-nowrap">
-                    <Smartphone className="w-4 h-4" />
-                    Connect Phone
-                 </button>
                </>
              )}
          </div>
@@ -1549,7 +1368,7 @@ const App: React.FC = () => {
                                 </div>
                              ) : (
                                 <div className="w-full p-6 flex flex-col items-center gap-3">
-                                    <Globe className="w-8 h-8 text-white/20 mx-auto" />
+                                    <ImageIcon className="w-8 h-8 text-white/20 mx-auto" />
                                     <input 
                                         type="text" 
                                         placeholder="Paste image URL here..."
@@ -1669,7 +1488,6 @@ const App: React.FC = () => {
       {view === 'monitor' && renderMonitor()}
       {view === 'photo-compare' && renderPhotoCompare()}
       {view === 'features' && renderFeatures()}
-      {renderLinkModal()}
     </Layout>
   );
 };
