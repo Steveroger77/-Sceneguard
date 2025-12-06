@@ -9,38 +9,38 @@ import { Camera, Trash2, Play, Pause, Upload, Loader2, Eye, Images, EyeOff, X, R
 const DEFAULT_FEATURES: Omit<FeatureItem, 'id'>[] = [
   {
     img: "https://lh3.googleusercontent.com/d/1h8Yd4g5z4HIX13m9qTCF7aQcdwxylNRO",
-    title: "Greetings! I'm Bala Holmes.",
-    desc: "Your guide to this advanced monitoring system. Allow me to demonstrate its remarkable capabilities and how to operate this high-tech machinery."
+    title: "Idhi chaduvu mundu gadidha!",
+    desc: "Stop clicking blindly like a monkey! I am Bala Holmes, and I am here to explain this high-tech machinery to you."
   },
   {
     img: "https://lh3.googleusercontent.com/d/1889m8uqBNdwgIc6AWO8J9E7ZG2YcvKxG",
-    title: "1. Create a Reference",
-    desc: "First, capture a scene. The system will memorize every object's position. A steady hand ensures a perfect baseline."
+    title: "1. Create Reference",
+    desc: "First, you show me a room. I memorize everything. Every spoon, every dust bunny. Don't shake the camera."
   },
   {
     img: "https://lh3.googleusercontent.com/d/1xd1EftsuQz4Mse_CDhvJGS-o-pUKd12a",
-    title: "2. Activate Monitor Mode",
-    desc: "Once a reference is set, I will watch vigilantly. Any object that is moved, added, or stolen will be instantly detected and reported."
+    title: "2. Monitor Mode",
+    desc: "Then, I watch. If someone moves your biryani or steals a pen, I will catch them. It's AI monitoring, but better."
   },
   {
     img: "https://lh3.googleusercontent.com/d/1bNU55AgFpLdJNfVLM5PTeXBHFuDAF8ez",
-    title: "3. Compare Photos Manually",
-    desc: "Have two photos and need to spot the differences? Upload them, and I'll highlight every change with precision."
+    title: "3. Photo Compare",
+    desc: "Got two photos? Upload them. I'll spot the differences faster than your aunty spots a flaw in your wedding match."
   },
   {
     img: "https://lh3.googleusercontent.com/d/1gRa6rrTjRYCTRbkQ8HPCUq5T4tV3G2Fr",
-    title: "Current Status & Future Work",
-    desc: "This prototype uses a foundational object detection model. We are actively working on integrating more advanced AI for enhanced accuracy and richer features."
+    title: "Current Bugs",
+    desc: "This is just a basic object detection model used for prototype. Inka Ai vada ledu adhi implement chesta dabidi dibide"
   },
   {
     img: "https://lh3.googleusercontent.com/d/1nIDW4eVxrzTS81WgnaUt4--5vj27QSdF",
-    title: "A Note on This Prototype",
-    desc: "As an early-stage version, development is ongoing. If you encounter any unexpected behavior, a simple refresh can often resolve it. Your feedback is valuable!"
+    title: "It's a Prototype, Relax",
+    desc: "Just the beginning stage. We are adding more features. Don't complain if it breaks, just refresh."
   },
   {
     img: "https://lh3.googleusercontent.com/d/18I6OII4JMGrANoNnGU9yxL7TxdC_rwP_",
-    title: "Explore and Discover",
-    desc: "The system has more to offer. Feel free to explore all the features and unlock its full potential for intelligent scene monitoring."
+    title: "Inka chala stuff undi dacham",
+    desc: "We have hidden a lot more stuff. Go explore. And behave yourself."
   }
 ];
 
