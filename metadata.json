@@ -1,0 +1,7 @@
+{
+  "name": "Sceneguard",
+  "description": "AI-powered scene monitoring and anomaly detection system.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

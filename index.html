@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SceneGuard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              fog: {
+                base: '#121416',   // Cobblestone Night
+                panel: '#23272B',  // Heavy Fog Grey
+                accent: '#8F9BB3', // Cold Steel Blade
+                light: '#C4CDD5',  // Lighter text
+                dim: '#4A5568',    // Muted text
+              },
+              brand: {
+                500: '#8F9BB3', // Map brand to accent
+                600: '#758299',
+              },
+              status: {
+                missing: '#ff5252', // Bright Red
+                present: '#69f0ae', // Bright Green
+                new: '#448aff',     // Bright Blue
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            animation: {
+              'float': 'float 6s ease-in-out infinite',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              }
+            }
+          },
+        },
+      };
+    </script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+      
+      html {
+        /* Firefox scrollbar styles */
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+      }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        /* Rich deep gradient for premium glassmorphism depth */
+        background-color: #000000;
+        background-image: 
+          radial-gradient(at 0% 0%, hsla(220, 30%, 20%, 1) 0, transparent 70%), 
+          radial-gradient(at 100% 100%, hsla(280, 40%, 15%, 1) 0, transparent 70%),
+          radial-gradient(at 50% 50%, hsla(240, 20%, 10%, 1) 0, transparent 100%);
+        background-attachment: fixed;
+        background-size: cover;
+        color: #8F9BB3;
+        overflow: hidden;
+      }
+      /* Custom scrollbar for Webkit browsers (Chrome, Safari, Edge) */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
