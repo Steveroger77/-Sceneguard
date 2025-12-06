@@ -1,13 +1,14 @@
 import React from 'react';
-import { LayoutDashboard, Camera, Images, Eye, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Camera, Images, Eye, Sparkles, LogOut } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
   currentView: string;
   onChangeView: (view: any) => void;
+  onResetApiKey: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView }) => {
+const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView, onResetApiKey }) => {
   const navItems = [
     { id: 'features', label: 'Features', icon: Sparkles },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -77,7 +78,16 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView }) 
             {currentView.replace('-', ' ')}
           </h1>
           <div className="flex items-center gap-4">
-             {/* Header Actions removed */}
+             {currentView !== 'features' && (
+                <button 
+                    onClick={onResetApiKey}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-colors border bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+                    title="Reset API Key"
+                >
+                    <LogOut className="w-4 h-4" />
+                    Reset API Key
+                </button>
+             )}
           </div>
         </header>
         <div className="flex-1 overflow-y-auto p-4 pr-6 pb-6 scroll-smooth">

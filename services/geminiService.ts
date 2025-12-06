@@ -87,10 +87,23 @@ const comparisonSchema = {
 
 const IGNORED_TERMS = ['camo', 'watermark', 'logo', 'ui', 'text', 'overlay', 'timestamp', 'recording', 'date', 'rec'];
 
-export const detectObjectsInScene = async (base64Image: string, retryCount = 0): Promise<DetectedObject[]> => {
+export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+  if (!apiKey) return false;
   try {
-    const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
-    if (!apiKey) throw new Error("API Key not found");
+    const ai = new GoogleGenAI({ apiKey });
+    // Make a lightweight, fast call to a simple model to check for authentication errors.
+    await ai.models.generateContent({ model: "gemini-2.5-flash", contents: "test" });
+    return true;
+  } catch (error: any) {
+    // A 400 or 403 error code typically indicates an invalid API key.
+    console.error("API Key Validation Error:", error);
+    return false;
+  }
+};
+
+export const detectObjectsInScene = async (apiKey: string, base64Image: string, retryCount = 0): Promise<DetectedObject[]> => {
+  try {
+    if (!apiKey) throw new Error("API Key not provided");
     const ai = new GoogleGenAI({ apiKey });
     
     let response;
@@ -141,7 +154,7 @@ export const detectObjectsInScene = async (base64Image: string, retryCount = 0):
         result = JSON.parse(jsonStr);
     } catch (e) {
         console.warn("JSON parse failed, retrying...", e);
-        if (retryCount < 2) return detectObjectsInScene(base64Image, retryCount + 1);
+        if (retryCount < 2) return detectObjectsInScene(apiKey, base64Image, retryCount + 1);
         return [];
     }
 
@@ -156,7 +169,7 @@ export const detectObjectsInScene = async (base64Image: string, retryCount = 0):
     // If result is empty, force a retry with the fallback model
     if (objects.length === 0 && retryCount < 2) {
       console.log("Empty result, retrying with fallback...");
-      return detectObjectsInScene(base64Image, retryCount + 1);
+      return detectObjectsInScene(apiKey, base64Image, retryCount + 1);
     }
 
     return objects.map((obj: any, index: number) => ({
@@ -175,7 +188,7 @@ export const detectObjectsInScene = async (base64Image: string, retryCount = 0):
     
     // Critical Fallback: If 3-Pro crashes (RPC error/timeout), retry with 2.5-Flash
     if (retryCount < 2) {
-        return detectObjectsInScene(base64Image, retryCount + 1);
+        return detectObjectsInScene(apiKey, base64Image, retryCount + 1);
     }
     
     // On error, return empty rather than crash
@@ -184,13 +197,13 @@ export const detectObjectsInScene = async (base64Image: string, retryCount = 0):
 };
 
 export const compareScenes = async (
+  apiKey: string,
   referenceBase64: string,
   liveBase64: string,
   knownObjects: DetectedObject[] // Pass context if available
 ): Promise<DetectedObject[]> => {
   try {
-    const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
-    if (!apiKey) throw new Error("API Key not found");
+    if (!apiKey) throw new Error("API Key not provided");
     const ai = new GoogleGenAI({ apiKey });
 
     const isBlindComparison = knownObjects.length === 0;
