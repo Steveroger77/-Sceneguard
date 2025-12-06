@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Layout from './components/Layout';
 import BoundingBoxOverlay from './components/BoundingBoxOverlay';
-import { detectObjectsInScene, compareScenes, validateApiKey } from './services/geminiService';
+import { detectObjectsInScene, compareScenes } from './services/geminiService';
 import { SceneReference, DetectedObject, ViewMode, ObjectStatus, BoundingBox, FeatureItem } from './types';
 import { initDB, getAllFeatures, addFeature, deleteFeature, updateFeature } from './services/db';
-import { Camera, Trash2, Play, Pause, Upload, Loader2, Eye, Images, EyeOff, X, RotateCcw, ChevronDown, ChevronUp, ListFilter, Save, Plus, ImageIcon, Video, VideoOff, Pencil, Check, KeyRound } from 'lucide-react';
+import { Camera, Trash2, Play, Pause, Upload, Loader2, Eye, Images, EyeOff, X, RotateCcw, ChevronDown, ChevronUp, ListFilter, Save, Plus, ImageIcon, Video, VideoOff, Pencil, Check } from 'lucide-react';
 
 const DEFAULT_FEATURES: Omit<FeatureItem, 'id'>[] = [
   {
@@ -30,7 +30,7 @@ const DEFAULT_FEATURES: Omit<FeatureItem, 'id'>[] = [
   {
     img: "https://lh3.googleusercontent.com/d/1gRa6rrTjRYCTRbkQ8HPCUq5T4tV3G2Fr",
     title: "Current Bugs",
-    desc: "When you open to create your reference for the first time it does not identify objects. Please click retake and it shows analyzing scene wait and then capture the image."
+    desc: "This is just a basic object detection model used for prototype. Inka Ai vada ledu adhi implement chesta dabidi dibide"
   },
   {
     img: "https://lh3.googleusercontent.com/d/1nIDW4eVxrzTS81WgnaUt4--5vj27QSdF",
@@ -43,91 +43,6 @@ const DEFAULT_FEATURES: Omit<FeatureItem, 'id'>[] = [
     desc: "We have hidden a lot more stuff. Go explore. And behave yourself.",
   }
 ];
-
-// --- Helper Functions for Tracking ---
-
-// Linear Interpolation for smoothing
-const lerp = (start: number, end: number, factor: number) => {
-  return start + (end - start) * factor;
-};
-
-// Calculate Intersection over Union (IoU) for tracking
-const calculateIoU = (boxA: BoundingBox, boxB: BoundingBox): number => {
-  const xA = Math.max(boxA.xmin, boxB.xmin);
-  const yA = Math.max(boxA.ymin, boxB.ymin);
-  const xB = Math.min(boxA.xmax, boxB.xmax);
-  const yB = Math.min(boxA.ymax, boxB.ymax);
-
-  const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
-  const boxAArea = (boxA.xmax - boxA.xmin) * (boxA.ymax - boxA.ymin);
-  const boxBArea = (boxB.xmax - boxB.xmin) * (boxB.ymax - boxB.ymin);
-
-  return interArea / (boxAArea + boxBArea - interArea);
-};
-
-// Robust reconciliation with simple smoothing (Simple Moving Average / LERP)
-const reconcileObjects = (oldObjects: DetectedObject[], newObjects: DetectedObject[]): DetectedObject[] => {
-  if (oldObjects.length === 0) return newObjects;
-
-  const matches: { newIdx: number; oldIdx: number; score: number }[] = [];
-
-  // 1. Calculate scores for all possible pairs
-  newObjects.forEach((newObj, newIdx) => {
-    oldObjects.forEach((oldObj, oldIdx) => {
-      // Loose Label Matching
-      const labelA = newObj.label.toLowerCase();
-      const labelB = oldObj.label.toLowerCase();
-      // Check exact match, or substring match
-      const labelMatch = labelA === labelB || labelA.includes(labelB) || labelB.includes(labelA);
-      
-      if (labelMatch) {
-        const iou = calculateIoU(newObj.box2d, oldObj.box2d);
-        // Threshold to consider it the "same" object visually
-        if (iou > 0.15) { 
-           // Score combines IoU and Label match preference
-           // We prioritize IoU heavily for tracking stability
-           matches.push({ newIdx, oldIdx, score: iou });
-        }
-      }
-    });
-  });
-
-  // 2. Sort matches by score (Highest IoU first) to greedily assign best matches
-  matches.sort((a, b) => b.score - a.score);
-
-  // 3. Assign matches without overlap
-  const assignedNew = new Set<number>();
-  const assignedOld = new Set<number>();
-  const resultObjects = [...newObjects];
-
-  for (const match of matches) {
-    if (!assignedNew.has(match.newIdx) && !assignedOld.has(match.oldIdx)) {
-      assignedNew.add(match.newIdx);
-      assignedOld.add(match.oldIdx);
-
-      const oldObj = oldObjects[match.oldIdx];
-      const newObj = newObjects[match.newIdx];
-
-      // LERP Factor: 0.7 means 70% new value, 30% old value. 
-      // This smooths out jitter from the detection model.
-      const smoothing = 0.7;
-
-      resultObjects[match.newIdx] = {
-        ...newObj,
-        id: oldObj.id, // CRITICAL: Preserve ID
-        userHidden: oldObj.userHidden, // Preserve user preference
-        box2d: {
-            ymin: lerp(oldObj.box2d.ymin, newObj.box2d.ymin, smoothing),
-            xmin: lerp(oldObj.box2d.xmin, newObj.box2d.xmin, smoothing),
-            ymax: lerp(oldObj.box2d.ymax, newObj.box2d.ymax, smoothing),
-            xmax: lerp(oldObj.box2d.xmax, newObj.box2d.xmax, smoothing),
-        }
-      };
-    }
-  }
-
-  return resultObjects;
-};
 
 // --- Reusable Custom Components ---
 
@@ -216,10 +131,6 @@ const App: React.FC = () => {
   // --- Core App Data ---
   const [references, setReferences] = useState<SceneReference[]>([]);
   const [activeRefId, setActiveRefId] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [tempApiKey, setTempApiKey] = useState<string>('');
-  const [isKeyValidating, setIsKeyValidating] = useState(false);
-  const [keyError, setKeyError] = useState<string | null>(null);
   
   // --- Features Data & DB State ---
   const [featuresList, setFeaturesList] = useState<FeatureItem[]>([]);
@@ -263,11 +174,6 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('gemini_api_key');
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
-    }
-
     getDevices();
     
     const initAppDB = async () => {
@@ -280,32 +186,6 @@ const App: React.FC = () => {
 
     return () => stopTracks(streamRef.current);
   }, []);
-
-  const handleSaveApiKey = async () => {
-    if (!tempApiKey || tempApiKey.trim().length < 10) {
-      setKeyError("Please enter a valid API key.");
-      return;
-    }
-    setKeyError(null);
-    setIsKeyValidating(true);
-    const isValid = await validateApiKey(tempApiKey);
-    setIsKeyValidating(false);
-
-    if (isValid) {
-      setApiKey(tempApiKey);
-      localStorage.setItem('gemini_api_key', tempApiKey);
-    } else {
-      setKeyError("Invalid API Key. Please check your key and try again.");
-    }
-  };
-
-  const handleResetApiKey = () => {
-    if (confirm("Are you sure you want to remove your API key?")) {
-      setApiKey(null);
-      setTempApiKey('');
-      localStorage.removeItem('gemini_api_key');
-    }
-  };
 
   const handleAddFeature = async () => {
     if (!newFeature.title || !newFeature.desc || !newFeature.img) return;
@@ -450,7 +330,6 @@ const App: React.FC = () => {
   }, []);
 
   const handleCaptureReference = async () => {
-    if (!apiKey) return;
     setIsProcessing(true);
     const dataUrl = captureFrame('high', true) || captureFrame('high', false);
     if (!dataUrl) {
@@ -459,8 +338,7 @@ const App: React.FC = () => {
     }
     setCurrentFrameImage(dataUrl);
     try {
-      const base64 = dataUrl.split(',')[1];
-      const objects = await detectObjectsInScene(apiKey, base64);
+      const objects = await detectObjectsInScene(dataUrl);
       setDetectedObjects(objects);
       setEditingRefName(`Scene ${references.length + 1}`);
     } catch (err) {
@@ -513,21 +391,19 @@ const App: React.FC = () => {
 
   const performScan = useCallback(async () => {
     const activeRef = references.find(r => r.id === activeRefId);
-    if (!activeRef || !apiKey || isMonitoringScanInProgress) return;
+    if (!activeRef || isMonitoringScanInProgress) return;
     const liveFrame = captureFrame('medium');
     if (!liveFrame) return;
     setIsMonitoringScanInProgress(true);
     try {
-      const refBase64 = activeRef.imageData.split(',')[1];
-      const liveBase64 = liveFrame.split(',')[1];
-      const newResults = await compareScenes(apiKey, refBase64, liveBase64, activeRef.objects);
-      setDetectedObjects(prev => reconcileObjects(prev, newResults));
+      const newResults = await compareScenes(activeRef.imageData, liveFrame, []);
+      setDetectedObjects(newResults);
     } catch (err) {
       console.error("Scan failed", err);
     } finally {
       setIsMonitoringScanInProgress(false);
     }
-  }, [apiKey, activeRefId, references, captureFrame, isMonitoringScanInProgress]);
+  }, [activeRefId, references, captureFrame, isMonitoringScanInProgress]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -547,12 +423,10 @@ const App: React.FC = () => {
   };
 
   const handlePhotoCompare = async () => {
-    if (!photoCompareRef || !photoCompareLive || !apiKey) return;
+    if (!photoCompareRef || !photoCompareLive) return;
     setIsProcessing(true);
     try {
-      const refBase64 = photoCompareRef.split(',')[1];
-      const liveBase64 = photoCompareLive.split(',')[1];
-      const results = await compareScenes(apiKey, refBase64, liveBase64, []);
+      const results = await compareScenes(photoCompareRef, photoCompareLive, []);
       setPhotoCompareResults(results);
     } catch (err) {
       console.error(err);
@@ -571,43 +445,6 @@ const App: React.FC = () => {
     { value: "", label: "Select Reference..." },
     ...references.map(r => ({ value: r.id, label: r.name }))
   ], [references]);
-
-  if (!apiKey) {
-    return (
-      <div className="flex items-center justify-center h-screen w-full bg-fog-base">
-        <div className="bg-black/40 backdrop-blur-2xl border border-white/5 rounded-3xl p-10 max-w-lg text-center shadow-2xl w-full animate-in fade-in zoom-in-95 duration-500">
-          <div className="w-16 h-16 bg-gradient-to-tr from-fog-accent/50 to-white/50 text-fog-base rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-fog-accent/20">
-            <KeyRound className="w-8 h-8" />
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Welcome to SceneGuard</h1>
-          <p className="text-fog-light/70 text-lg mb-6">
-            Please enter your Google Gemini API key to begin.
-          </p>
-          <div className="flex flex-col gap-4">
-            <input
-              type="password"
-              placeholder="Enter your API key here"
-              value={tempApiKey}
-              onChange={(e) => setTempApiKey(e.target.value)}
-              className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-fog-accent text-center transition-colors"
-            />
-             {keyError && <p className="text-red-400 text-sm mt-1">{keyError}</p>}
-            <button
-              onClick={handleSaveApiKey}
-              disabled={isKeyValidating}
-              className="w-full px-8 py-3 bg-fog-accent text-fog-base rounded-xl font-bold hover:scale-105 transition-all shadow-lg shadow-fog-accent/20 flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isKeyValidating && <Loader2 className="w-5 h-5 animate-spin"/>}
-              {isKeyValidating ? 'Validating...' : 'Save & Start'}
-            </button>
-          </div>
-          <p className="text-fog-dim mt-6 text-xs">
-            Your key is saved only in your browser's local storage.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   const renderCreateReference = () => (
     <div className="h-full flex flex-col gap-6">
@@ -940,7 +777,7 @@ const App: React.FC = () => {
     );
 
   return (
-    <Layout currentView={view} onChangeView={setView} onResetApiKey={handleResetApiKey}>
+    <Layout currentView={view} onChangeView={setView}>
       {view === 'dashboard' && renderDashboard()}
       {view === 'create-reference' && renderCreateReference()}
       {view === 'monitor' && renderMonitor()}
