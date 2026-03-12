@@ -2,48 +2,8 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import Layout from './components/Layout';
 import BoundingBoxOverlay from './components/BoundingBoxOverlay';
 import { detectObjectsInScene, compareScenes } from './services/geminiService';
-import { SceneReference, DetectedObject, ViewMode, ObjectStatus, BoundingBox, FeatureItem } from './types';
-import { initDB, getAllFeatures, addFeature, deleteFeature, updateFeature } from './services/db';
-import { Camera, Trash2, Play, Pause, Upload, Loader2, Eye, Images, EyeOff, X, RotateCcw, ChevronDown, ChevronUp, ListFilter, Save, Plus, ImageIcon, Video, VideoOff, Pencil, Check } from 'lucide-react';
-
-const DEFAULT_FEATURES: Omit<FeatureItem, 'id'>[] = [
-  {
-    img: "https://lh3.googleusercontent.com/d/1h8Yd4g5z4HIX13m9qTCF7aQcdwxylNRO",
-    title: "Idhi chaduvu mundu gadidha!",
-    desc: "Stop clicking blindly like a monkey! I am Bala Holmes, and I am here to explain this high-tech machinery to you."
-  },
-  {
-    img: "https://lh3.googleusercontent.com/d/1889m8uqBNdwgIc6AWO8J9E7ZG2YcvKxG",
-    title: "1. Create Reference",
-    desc: "First, you show me a room. I memorize everything. Every spoon, every dust bunny. Don't shake the camera."
-  },
-  {
-    img: "https://lh3.googleusercontent.com/d/1xd1EftsuQz4Mse_CDhvJGS-o-pUKd12a",
-    title: "2. Monitor Mode",
-    desc: "Then, I watch. If someone moves your biryani or steals a pen, I will catch them. It's AI monitoring, but better."
-  },
-  {
-    img: "https://lh3.googleusercontent.com/d/1bNU55AgFpLdJNfVLM5PTeXBHFuDAF8ez",
-    title: "3. Photo Compare",
-    desc: "Got two photos? Upload them. I'll spot the differences faster than your aunty spots a flaw in your wedding match."
-  },
-  {
-    img: "https://lh3.googleusercontent.com/d/1gRa6rrTjRYCTRbkQ8HPCUq5T4tV3G2Fr",
-    title: "Current Bugs",
-    desc: "This is just a basic object detection model used for prototype. Inka Ai vada ledu adhi implement chesta dabidi dibide"
-  },
-  {
-    img: "https://lh3.googleusercontent.com/d/1nIDW4eVxrzTS81WgnaUt4--5vj27QSdF",
-    title: "It's a Prototype, Relax",
-    desc: "Just the beginning stage. We are adding more features. Don't complain if it breaks, just refresh."
-  },
-  {
-    img: "https://lh3.googleusercontent.com/d/18I6OII4JMGrANoNnGU9yxL7TxdC_rwP_",
-    title: "Inka chala stuff undi dacham",
-    desc: "We have hidden a lot more stuff. Go explore. And behave yourself."
-  }
-];
-
+import { SceneReference, DetectedObject, ViewMode, ObjectStatus } from './types';
+import { Camera, Trash2, Play, Pause, Upload, Loader2, Eye, Images, EyeOff, X, RotateCcw, ChevronDown, ListFilter, Save, Video, VideoOff, Pencil, Check } from 'lucide-react';
 
 // --- Reusable Custom Components ---
 
@@ -134,17 +94,11 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
 
 const App: React.FC = () => {
   // --- Global Navigation & Mode ---
-  const [view, setView] = useState<ViewMode>('features');
+  const [view, setView] = useState<ViewMode>('dashboard');
   
   // --- Core App Data ---
   const [references, setReferences] = useState<SceneReference[]>([]);
   const [activeRefId, setActiveRefId] = useState<string | null>(null);
-  
-  // --- Features Data & DB State ---
-  const [featuresList, setFeaturesList] = useState<FeatureItem[]>([]);
-  const [isAddingFeature, setIsAddingFeature] = useState(false);
-  const [newFeature, setNewFeature] = useState<{title: string, desc: string, img: string | null}>({ title: '', desc: '', img: null });
-  const [inputType, setInputType] = useState<'upload' | 'url'>('upload');
 
   // --- Camera State ---
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -184,81 +138,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     getDevices();
-    
-    const initAppDB = async () => {
-       await initDB(DEFAULT_FEATURES);
-       const feats = await getAllFeatures();
-       feats.sort((a, b) => (a.order ?? a.id) - (b.order ?? b.id));
-       setFeaturesList(feats);
-    };
-    initAppDB();
-
     return () => stopTracks(streamRef.current);
   }, []);
-
-  const handleAddFeature = async () => {
-    if (!newFeature.title || !newFeature.desc || !newFeature.img) return;
-    try {
-      await addFeature({ ...newFeature, isDefault: false, order: featuresList.length });
-      const feats = await getAllFeatures();
-      feats.sort((a, b) => (a.order ?? a.id) - (b.order ?? b.id));
-      setFeaturesList(feats);
-      setNewFeature({ title: '', desc: '', img: null });
-      setIsAddingFeature(false);
-    } catch (e) { console.error("Failed to add feature", e); }
-  };
-
-  const handleUpdateImage = async (id: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const newImg = ev.target?.result as string;
-        const itemIndex = featuresList.findIndex(f => f.id === id);
-        if (itemIndex > -1) {
-            const updatedItem = { ...featuresList[itemIndex], img: newImg };
-            const newList = [...featuresList];
-            newList[itemIndex] = updatedItem;
-            setFeaturesList(newList);
-            try { await updateFeature(updatedItem); } 
-            catch (err) { console.error("Failed to update feature image in DB", err); }
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleMoveFeature = async (index: number, direction: 'up' | 'down') => {
-    if ((direction === 'up' && index === 0) || (direction === 'down' && index === featuresList.length - 1)) return;
-    const newFeatures = [...featuresList];
-    const swapIndex = direction === 'up' ? index - 1 : index + 1;
-    [newFeatures[index], newFeatures[swapIndex]] = [newFeatures[swapIndex], newFeatures[index]];
-    newFeatures.forEach((f, i) => f.order = i);
-    setFeaturesList(newFeatures);
-    try {
-      for (const f of newFeatures) { await updateFeature(f); }
-    } catch (e) { console.error("Failed to update order", e); }
-  };
-
-  const handleDeleteFeature = async (id: number) => {
-    if (confirm("Are you sure?")) {
-      try {
-        await deleteFeature(id);
-        const feats = await getAllFeatures();
-        feats.sort((a, b) => (a.order ?? a.id) - (b.order ?? b.id));
-        setFeaturesList(feats);
-      } catch (e) { console.error("Failed to delete feature", e); }
-    }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => setNewFeature(prev => ({ ...prev, img: ev.target?.result as string }));
-      reader.readAsDataURL(file);
-    }
-  };
 
   const getDevices = async () => {
     try {
@@ -735,82 +616,12 @@ const App: React.FC = () => {
     </div>
   );
 
-  const renderFeatures = () => (
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
-         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-8 md:p-12 relative overflow-hidden flex items-center justify-between shadow-2xl">
-              <div className="relative z-10 max-w-3xl">
-                  <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 font-serif tracking-tight drop-shadow-lg">SceneGuard Capabilities</h2>
-                  <p className="text-xl text-white/70 leading-relaxed font-light">Advanced AI-powered scene monitoring, anomaly detection, and change tracking system. Guided by the legendary Bala Holmes.</p>
-              </div>
-              <div className="z-20 relative hidden md:block">
-                  <button onClick={() => setIsAddingFeature(!isAddingFeature)} className="flex items-center gap-2 px-8 py-4 bg-fog-accent text-fog-base rounded-2xl font-bold hover:scale-105 hover:bg-white transition-all duration-300 shadow-[0_0_20px_rgba(143,155,179,0.3)]">
-                     {isAddingFeature ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {isAddingFeature ? "Cancel" : "Add Feature"}
-                  </button>
-              </div>
-              <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-fog-accent/20 blur-[120px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/4" />
-         </div>
-         {isAddingFeature && (
-            <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-[32px] p-8 animate-in fade-in slide-in-from-top-4 duration-500 ease-out">
-               <h3 className="text-2xl font-bold text-white mb-6">Add New Feature</h3>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                     <div className="space-y-2"><label className="text-sm text-white/60 font-medium ml-1">Feature Title</label><input type="text" placeholder="e.g., Night Vision Mode" value={newFeature.title} onChange={(e) => setNewFeature({...newFeature, title: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-fog-accent transition-colors"/></div>
-                     <div className="space-y-2"><label className="text-sm text-white/60 font-medium ml-1">Description</label><textarea placeholder="Describe this feature..." value={newFeature.desc} onChange={(e) => setNewFeature({...newFeature, desc: e.target.value})} rows={3} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-fog-accent resize-none transition-colors"/></div>
-                  </div>
-                  <div className="space-y-4">
-                      <div className="flex gap-2 mb-2">
-                          <button onClick={() => setInputType('upload')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors border ${inputType === 'upload' ? 'bg-white text-black border-white' : 'bg-transparent text-white/40 border-white/10 hover:border-white/20'}`}>Upload Image</button>
-                          <button onClick={() => setInputType('url')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors border ${inputType === 'url' ? 'bg-white text-black border-white' : 'bg-transparent text-white/40 border-white/10 hover:border-white/20'}`}>Image URL</button>
-                      </div>
-                      <div className="h-full min-h-[200px] bg-black/40 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-white/30 transition-colors">
-                          {newFeature.img ? (<><img src={newFeature.img} alt="Preview" className="w-full h-full object-cover" /><button onClick={() => setNewFeature({...newFeature, img: null})} className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full hover:bg-red-500 transition-colors"><X className="w-4 h-4" /></button></>) : (inputType === 'upload' ? (<div className="text-center p-6"><ImageIcon className="w-8 h-8 text-white/20 mx-auto mb-2" /><span className="text-white/40 text-sm">Click to Upload</span></div>) : (<div className="w-full p-6 flex flex-col items-center gap-3"><ImageIcon className="w-8 h-8 text-white/20 mx-auto" /><input type="text" placeholder="Paste image URL here..." className="w-full bg-black/50 border border-white/20 rounded-lg px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-fog-accent text-center" onChange={(e) => setNewFeature({...newFeature, img: e.target.value})}/></div>))}
-                          {inputType === 'upload' && !newFeature.img && (<input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer" />)}
-                      </div>
-                  </div>
-               </div>
-               <div className="flex justify-end mt-6"><button onClick={handleAddFeature} disabled={!newFeature.title || !newFeature.desc || !newFeature.img} className="px-8 py-3 bg-status-present text-fog-base rounded-xl font-bold hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:scale-100">Save Feature</button></div>
-            </div>
-         )}
-         <div className="flex flex-col gap-6 pb-12">
-            {featuresList.map((item, index) => (
-               <div key={item.id} className="group relative w-full p-8 rounded-[40px] border border-white/10 bg-white/5 backdrop-blur-xl hover:bg-white/10 hover:border-white/20 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] overflow-hidden" style={{ animationDelay: `${index * 100}ms` }}>
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-                  <div className="flex items-start gap-8 relative z-10">
-                      <div className="w-32 h-32 md:w-40 md:h-40 rounded-3xl overflow-hidden border border-white/10 shadow-2xl shrink-0 relative group/image cursor-pointer transform transition-transform duration-500 group-hover:scale-[1.02] bg-black/20">
-                           <img src={item.img} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop'; }}/>
-                           <label className="absolute inset-0 bg-black/40 backdrop-blur-[4px] flex flex-col items-center justify-center opacity-0 group-hover/image:opacity-100 transition-all duration-300">
-                               <Upload className="w-6 h-6 text-white mb-2 drop-shadow-md" />
-                               <span className="text-[10px] font-bold text-white uppercase tracking-widest bg-black/50 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md">Change</span>
-                               <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUpdateImage(item.id, e)}/>
-                           </label>
-                      </div>
-                      <div className="flex-1 min-w-0 py-2">
-                          <div className="flex items-start justify-between">
-                            <h3 className="text-2xl md:text-3xl font-bold text-white mb-3 leading-tight group-hover:text-fog-accent transition-colors duration-300">{item.title}</h3>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0 bg-black/20 backdrop-blur-md p-1.5 rounded-xl border border-white/10">
-                               <button onClick={() => handleMoveFeature(index, 'up')} className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors" title="Move Up" disabled={index === 0}><ChevronUp className="w-4 h-4" /></button>
-                               <button onClick={() => handleMoveFeature(index, 'down')} className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors" title="Move Down" disabled={index === featuresList.length - 1}><ChevronDown className="w-4 h-4" /></button>
-                               <div className="w-px h-4 bg-white/20 mx-1"></div>
-                               <button onClick={() => handleDeleteFeature(item.id)} className="p-2 text-white/50 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete Feature"><Trash2 className="w-4 h-4" /></button>
-                           </div>
-                          </div>
-                           <div className="w-12 h-1.5 bg-white/10 rounded-full group-hover:w-24 group-hover:bg-fog-accent transition-all duration-500 ease-out mb-4" />
-                           <p className="text-lg text-white/60 leading-relaxed font-light">{item.desc}</p>
-                      </div>
-                  </div>
-               </div>
-            ))}
-         </div>
-      </div>
-    );
-
   return (
     <Layout currentView={view} onChangeView={setView}>
       {view === 'dashboard' && renderDashboard()}
       {view === 'create-reference' && renderCreateReference()}
       {view === 'monitor' && renderMonitor()}
       {view === 'photo-compare' && renderPhotoCompare()}
-      {view === 'features' && renderFeatures()}
     </Layout>
   );
 };

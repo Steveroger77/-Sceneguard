@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Camera, Images, Eye, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Camera, Images, Eye } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,7 +9,6 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView }) => {
   const navItems = [
-    { id: 'features', label: 'Features', icon: Sparkles },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'create-reference', label: 'New Reference', icon: Camera },
     { id: 'monitor', label: 'Monitor Scene', icon: Eye },
