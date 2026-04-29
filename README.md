@@ -46,4 +46,3 @@ SceneGuard is an intelligent monitoring system that helps you keep track of your
 
 ---
 SceneGuard: https://sceneguard.vercel.app/
-*Made with ❤️ for a smarter, safer space.*
